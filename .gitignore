@@ -1,0 +1,14 @@
+node_modules/
+inspirações/
+dist/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+android/.gradle/
+android/local.properties
+android/**/build/
+.cache/
+test-results/
+playwright-report/
+android-test-results/

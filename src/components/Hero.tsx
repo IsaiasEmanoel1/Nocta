@@ -1,0 +1,9 @@
+import { Link } from 'react-router'
+import { Play, Bookmark, Check, Star, Sparkles } from 'lucide-react'
+import type { Media } from '../domain/media'
+import { useLibrary } from '../state/library'
+
+export function Hero({ media }: { media: Media }) {
+  const { isFavorite, toggleFavorite } = useLibrary()
+  return <section className="hero"><div className="hero-image" style={{ backgroundImage: `url("${media.backdrop}")` }} /><div className="hero-gradient" /><div className="hero-content"><div className="hero-label"><span className="tiny-line" /><Sparkles size={13} /> UMA HISTÓRIA PARA HOJE</div><div className="hero-genres">{media.genres.slice(0, 2).join(' / ')}</div><h1 className={media.source === 'fiction' ? 'fiction-hero-title' : ''}>{media.title}</h1><div className="hero-meta">{media.rating > 0 && <span className="rating-pill"><Star size={13} fill="currentColor" /> {media.rating.toFixed(1)}</span>}<span>{media.year || 'Em breve'}</span><span className="age-tag">{media.kind === 'tv' ? 'SÉRIE' : 'FILME'}</span>{media.runtime && <span>{media.runtime} min</span>}<span className="quality-tag">{media.source === 'fiction' ? 'FICTÍCIO' : 'TMDB'}</span></div><p className="hero-description">{media.overview}</p><div className="hero-buttons"><Link state={{media}} to={`/assistir/${media.id}`} className="button button-primary hero-play"><Play size={21} fill="currentColor" aria-hidden="true" />Assistir</Link><button className="button button-glass" onClick={() => toggleFavorite(media)} aria-pressed={isFavorite(media.id)}>{isFavorite(media.id) ? <Check size={18} /> : <Bookmark size={18} />}{isFavorite(media.id) ? 'Na minha lista' : 'Minha lista'}</button></div></div><div className="hero-bottom"><span><span className="live-dot" /> HISTÓRIAS QUE FICAM COM VOCÊ</span><span className="hero-pagination"><b>01</b><i /><span>EM DESTAQUE</span></span></div></section>
+}

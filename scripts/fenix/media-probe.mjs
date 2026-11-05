@@ -1,0 +1,4 @@
+import https from 'node:https';import fs from 'node:fs/promises'
+const p=JSON.parse(await fs.readFile('.cache/fenix-configured/probe.json','utf8'))
+for(const r of p.results){const s=r.data?.streams?.find(s=>s.url&&!s.behaviorHints?.proxyHeaders);if(!s)continue
+await new Promise(resolve=>{https.get(s.url,{timeout:20000,headers:{Origin:'http://127.0.0.1:5176'}},res=>{let text='';res.on('data',c=>{if(text.length<30000)text+=c});res.on('end',()=>{const origins=[...new Set([...text.matchAll(/https?:\/\/[^\s"'<>]+/g)].map(m=>{try{return new URL(m[0]).origin}catch{return '?'}}))];console.log(JSON.stringify({operation:r.path,status:res.statusCode,mime:res.headers['content-type'],cors:res.headers['access-control-allow-origin'],playlist:text.startsWith('#EXTM3U'),redirect:res.headers.location?new URL(res.headers.location,s.url).origin:null,origins}));resolve()})}).on('error',e=>{console.log(e.message);resolve()}).on('timeout',function(){this.destroy(Error('timeout'))})})}

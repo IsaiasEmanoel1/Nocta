@@ -1,0 +1,45 @@
+import { expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import App from '../App'
+import { catalog, DemoCatalogProvider, mapTmdb } from '../services/catalog'
+it('navigates to details and changes seasons without enabling unlicensed playback', async () => {
+  const fixture = new DemoCatalogProvider()
+  vi.spyOn(catalog, 'detail').mockImplementation(id => fixture.detail(id))
+  vi.spyOn(catalog, 'episodes').mockImplementation((media, season) => fixture.episodes(media, season))
+  window.history.replaceState({}, '', '/titulo/fiction-3')
+  const view = render(<App />)
+  expect(await screen.findByRole('heading', { level: 1, name: 'Ecos do Amanhã' })).toBeInTheDocument()
+  await waitFor(() => expect(view.container.querySelectorAll('.episode')).toHaveLength(6))
+  fireEvent.change(screen.getByLabelText('Selecionar temporada'), { target: { value: '2' } })
+  await waitFor(() => expect(view.container.querySelectorAll('.episode')).toHaveLength(4))
+  expect(screen.queryByRole('link', { name: 'Assistir Agora' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar à lista' }))
+  expect(screen.getByRole('button', { name: 'Na minha lista' })).toHaveAttribute('aria-pressed', 'true')
+})
+it('opens playback from the hero and cards while retaining secondary details links', async () => {
+  vi.spyOn(catalog, 'home').mockResolvedValue({ origin: 'tmdb', data: [mapTmdb({ id: 9001, title: 'Filme de teste', release_date: '2026-01-01', poster_path: '/poster.jpg' }, 'movie')] })
+  window.history.replaceState({}, '', '/')
+  const view = render(<App />)
+  const play = await screen.findByRole('link', { name: /^Assistir$/ })
+  expect(play).toHaveAttribute('href', '/assistir/tmdb-movie-9001')
+  expect(Array.from(view.container.querySelectorAll<HTMLAnchorElement>('.poster-link, .card-title')).every(link => link.pathname.startsWith('/assistir/'))).toBe(true)
+  expect(view.container.querySelector('.card-details')).toHaveAttribute('href', expect.stringMatching(/^\/titulo\//))
+  fireEvent.click(play)
+  expect(await screen.findByRole('heading', { name: 'Reprodução não disponível' })).toBeInTheDocument()
+  expect(window.location.pathname).toBe('/assistir/tmdb-movie-9001')
+})
+it('searches a deep link and updates results when a filter is changed', async () => {
+  const media = mapTmdb({ id: 9002, name: 'Órbita', first_air_date: '2026-01-01', poster_path: '/poster.jpg' }, 'tv')
+  vi.spyOn(catalog, 'search').mockImplementation(async (_query, filters) => ({ origin: 'tmdb', data: filters.kind === 'movie' ? [] : [media] }))
+  window.history.replaceState({}, '', '/buscar?q=orbita')
+  render(<App />)
+  expect(await screen.findByText('Órbita')).toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Tipo de conteúdo'), { target: { value: 'movie' } })
+  expect(await screen.findByRole('heading', { name: 'Essa história ainda não apareceu' })).toBeInTheDocument()
+})
+it('handles unknown routes and disallowed playback IDs', async () => {
+  window.history.replaceState({}, '', '/assistir/tmdb-movie-123')
+  render(<App />)
+  expect(await screen.findByRole('heading', { name: 'Reprodução não disponível' })).toBeInTheDocument()
+  expect(document.querySelector('video')).toBeNull()
+})
