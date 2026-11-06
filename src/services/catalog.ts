@@ -18,7 +18,7 @@ export class DemoCatalogProvider implements CatalogProvider {
   async episodes(media: Media, season: number) { return fallback(fixtureEpisodes(media, season)) }
 }
 
-type TmdbRecord = { id: number; adult?: boolean; title?: string; name?: string; original_title?: string; original_name?: string; overview?: string; release_date?: string; first_air_date?: string; vote_average?: number; poster_path?: string; backdrop_path?: string; genre_ids?: number[]; genres?: { id: number; name: string }[]; runtime?: number; episode_run_time?: number[]; tagline?: string; seasons?: { id: number; season_number: number; name: string; episode_count: number }[]; created_by?: { name: string }[]; recommendations?: { results: TmdbRecord[] }; credits?: { crew?: { name: string; job: string }[]; cast: { name: string; character: string; profile_path?: string }[] }; media_type?: string }
+type TmdbRecord = { id: number; adult?: boolean; title?: string; name?: string; original_title?: string; original_name?: string; original_language?: string; overview?: string; release_date?: string; first_air_date?: string; vote_average?: number; poster_path?: string; backdrop_path?: string; genre_ids?: number[]; genres?: { id: number; name: string }[]; runtime?: number; episode_run_time?: number[]; tagline?: string; seasons?: { id: number; season_number: number; name: string; episode_count: number }[]; created_by?: { name: string }[]; recommendations?: { results: TmdbRecord[] }; credits?: { crew?: { name: string; job: string }[]; cast: { name: string; character: string; profile_path?: string }[] }; media_type?: string }
 export function validTmdbRecord(value: unknown, kind: MediaKind): value is TmdbRecord {
   if (!value || typeof value !== 'object') return false
   const item = value as TmdbRecord
@@ -48,7 +48,7 @@ function mapList(records: unknown, kind?: MediaKind): Media[] {
 export const imageUrl = (path: string | undefined, width: 'w500' | 'w1280' = 'w500') => path ? `https://image.tmdb.org/t/p/${width}${path}` : '/art/poster-1.svg'
 export function mapTmdb(item: TmdbRecord, kind: MediaKind): Media {
   const genreIds = item.genres?.map(g => g.id) ?? item.genre_ids ?? []
-  return { id: `tmdb-${kind}-${item.id}`, kind, title: item.title ?? item.name ?? 'Sem título', originalTitle: item.original_title ?? item.original_name,
+  return { id: `tmdb-${kind}-${item.id}`, kind, title: item.title ?? item.name ?? 'Sem título', originalTitle: item.original_title ?? item.original_name, originalLanguage: item.original_language,
     overview: item.overview || 'Ainda não há uma descrição disponível em português.', year: Number((item.release_date ?? item.first_air_date ?? '').slice(0, 4)) || 0,
     rating: item.vote_average ?? 0, genres: item.genres?.map(g => g.name) ?? genreIds.map(id => (kind === 'movie' ? movieGenres : tvGenres)[id]).filter(Boolean), genreIds,
     poster: imageUrl(item.poster_path), backdrop: item.backdrop_path ? imageUrl(item.backdrop_path, 'w1280') : '/art/scene-0.svg',
@@ -127,7 +127,7 @@ export class TmdbCatalogProvider implements CatalogProvider {
       if (scan && !found.length && hasMore) cursor = Math.min(cursor, page + 2)
       const seen = new Set<string>()
       return { origin: 'tmdb', data: { items: found.filter(item => !seen.has(item.id) && Boolean(seen.add(item.id))), page: cursor, totalPages, totalResults, hasMore, nextPage: hasMore ? cursor + 1 : null },
-        ...(scan ? { notice: 'Combinação sem filtro direto no TMDB: percorremos até 3 páginas por toque. Total filtrado desconhecido; Ver mais continua a busca, mesmo sem correspondências neste lote.' } : !kind && !query && spec.source === 'discover' ? { notice: 'Filmes e séries são combinados por página; a ordenação é aplicada pelo TMDB separadamente por tipo.' } : {}) }
+        ...(scan ? { notice: 'Combinação sem filtro direto no TMDB: percorremos até 3 páginas por toque. Total filtrado desconhecido; Ver mais continua a busca, mesmo sem correspondências neste lote.' } : {}) }
     } catch (error) {
       if (signal?.aborted) throw error
       return failure('Não foi possível carregar mais resultados. Os cards anteriores foram preservados; tente novamente.')

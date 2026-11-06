@@ -1,0 +1,207 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nocta Lab — Teste de fornecedores</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 24px;
+  background: #09111e; color: white;
+  font-family: Arial, sans-serif;
+}
+main { max-width: 1100px; margin: auto; }
+h1 { color: #56d8ff; }
+.controls {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px; margin: 20px 0;
+}
+label { display: grid; gap: 7px; }
+input, select {
+  padding: 12px; width: 100%;
+  background: #17263a; color: white;
+  border: 1px solid #436078; border-radius: 8px;
+}
+button {
+  padding: 12px 18px; margin: 5px 5px 5px 0;
+  border: 0; border-radius: 9px;
+  background: #19c3f4; color: #06111d;
+  font-weight: bold; cursor: pointer;
+}
+.player {
+  margin-top: 20px; width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #02060c;
+  border: 1px solid #34516c;
+  border-radius: 12px;
+  overflow: hidden;
+}
+iframe { width: 100%; height: 100%; border: 0; }
+#status { color: #a9c8dc; }
+@media(max-width: 600px) {
+  .controls { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+<main>
+<h1>Nocta Lab</h1>
+<p>Teste independente de fornecedores, sem alterar o Nocta.</p>
+
+<div class="controls">
+  <label>Fornecedor
+    <select id="provider">
+      <option value="super">SuperEmbed</option>
+      <option value="warez">WarezCDN</option>
+    </select>
+  </label>
+
+  <label>Tipo de conteúdo
+    <select id="type">
+      <option value="filme">Filme</option>
+      <option value="serie">Série / anime</option>
+    </select>
+  </label>
+
+  <label>Tipo de ID
+    <select id="idType">
+      <option value="tmdb">TMDB</option>
+      <option value="imdb">IMDb</option>
+    </select>
+  </label>
+
+  <label>ID do título
+    <input id="mediaId" value="196254">
+  </label>
+
+  <label>Temporada
+    <input id="season" type="number" value="1" min="1">
+  </label>
+
+  <label>Episódio
+    <input id="episode" type="number" value="1" min="1">
+  </label>
+</div>
+
+<button onclick="testar()">Testar player</button>
+<button onclick="abrirOriginal()">Abrir página original</button>
+<button onclick="verificarVIP()">Verificar VIP SuperEmbed</button>
+<button onclick="fechar()">Fechar player</button>
+
+<p id="status">Pronto para testar.</p>
+<div class="player" id="player"></div>
+
+<p>
+  O carregamento da página não confirma que o vídeo existe.
+  Confira imagem e som manualmente.
+</p>
+</main>
+
+<script>
+function obterURL() {
+  const provider = document.getElementById("provider").value;
+  const tipo = document.getElementById("type").value;
+  const idType = document.getElementById("idType").value;
+  const id = document.getElementById("mediaId").value.trim();
+  const season = document.getElementById("season").value;
+  const episode = document.getElementById("episode").value;
+
+  if (idType === "tmdb" && !/^\d+$/.test(id)) {
+    throw Error("ID TMDB deve conter apenas números.");
+  }
+  if (idType === "imdb" && !/^tt\d+$/.test(id)) {
+    throw Error("ID IMDb deve começar com tt.");
+  }
+
+  let url;
+
+  if (provider === "super") {
+    const params = new URLSearchParams({ video_id: id });
+
+    if (idType === "tmdb") params.set("tmdb", "1");
+
+    if (tipo === "serie") {
+      params.set("s", season);
+      params.set("e", episode);
+    }
+
+    url = "https://multiembed.mov/?" + params.toString();
+  } else {
+    if (tipo === "serie" && idType !== "tmdb") {
+      throw Error("Para séries no WarezCDN, use ID TMDB.");
+    }
+
+    url = "https://warezcdn.sbs/" +
+      (tipo === "filme" ? "filme" : "serie") + "/" + id;
+
+    if (tipo === "serie") {
+      url += "/" + season + "/" + episode;
+    }
+  }
+
+  return url;
+}
+
+function informar(mensagem) {
+  document.getElementById("status").textContent = mensagem;
+}
+
+function testar() {
+  try {
+    const url = obterURL();
+    const frame = document.createElement("iframe");
+
+    frame.setAttribute(
+      "allow",
+      "autoplay; encrypted-media; fullscreen; picture-in-picture"
+    );
+    frame.setAttribute("allowfullscreen", "");
+
+    frame.onload = () => informar(
+      "Iframe carregado. Verifique se o vídeo realmente reproduz."
+    );
+
+    document.getElementById("player").replaceChildren(frame);
+    informar("Carregando player...");
+    frame.src = url;
+  } catch (erro) {
+    informar(erro.message);
+  }
+}
+
+function abrirOriginal() {
+  try {
+    window.open(obterURL(), "_blank", "noopener,noreferrer");
+  } catch (erro) {
+    informar(erro.message);
+  }
+}
+
+function verificarVIP() {
+  try {
+    if (document.getElementById("provider").value !== "super") {
+      informar("A verificação VIP é exclusiva do SuperEmbed.");
+      return;
+    }
+
+    const url = new URL(obterURL());
+    url.pathname = "/directstream.php";
+    url.searchParams.set("check", "1");
+
+    window.open(url.toString(), "_blank", "noopener,noreferrer");
+    informar("Resultado esperado: 1 = VIP disponível; 0 = VIP indisponível.");
+  } catch (erro) {
+    informar(erro.message);
+  }
+}
+
+function fechar() {
+  document.getElementById("player").replaceChildren();
+  informar("Player fechado.");
+}
+</script>
+</body>
+</html>

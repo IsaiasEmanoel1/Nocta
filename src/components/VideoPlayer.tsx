@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Maximize, RotateCcw, RotateCw, Volume2, VolumeX, Play, Pause, Settings, ArrowLeft } from 'lucide-react'
+import { Maximize, Minimize, RotateCcw, RotateCw, Volume2, VolumeX, Play, Pause, Settings, ArrowLeft } from 'lucide-react'
 import type { Media } from '../domain/media'
 import type { PlaybackSession } from '../services/playback'
 import { isTimedProgress, isCompleted, useLibrary } from '../state/library'
@@ -21,12 +21,13 @@ interface VideoPlayerProps {
   initialPositionSeconds?: number
   onStateChange?(phase:'playing'|'paused'|'buffering'):void
   onPlaybackEvent?(event: 'loaded' | 'playing' | 'progress' | 'failed', seconds?: number, detail?: string): void
+  onRendererEvent?(event:'preparação'|'video'|'audio'|'reprodução-confirmada',position?:number):void
   persistHistory?: boolean
   validateMediaUrl?(url: string): void
   session: PlaybackSession; media: Media; episode?: EpisodeSelection; overlay?: ReactNode
   onProgress?(progress: PlaybackProgress): void; onEnded?(): void; startOnReady?: boolean
 }
-export function VideoPlayer({ session, media, episode, overlay, onProgress, onEnded, startOnReady = false, persistHistory = true, onPlaybackEvent, validateMediaUrl, initialPositionSeconds, onStateChange,reportAvailability=true,requireVideo=false,simpleFeedback=false,integrated=false,onSources,controlsEnabled=true }: VideoPlayerProps) {
+export function VideoPlayer({ session, media, episode, overlay, onProgress, onEnded, startOnReady = false, persistHistory = true, onPlaybackEvent, onRendererEvent, validateMediaUrl, initialPositionSeconds, onStateChange,reportAvailability=true,requireVideo=false,simpleFeedback=false,integrated=false,onSources,controlsEnabled=true }: VideoPlayerProps) {
   const video = useRef<HTMLVideoElement>(null)
   const wrapper = useRef<HTMLDivElement>(null)
   const { saveProgress, setCompleted, state } = useLibrary()
@@ -39,6 +40,18 @@ export function VideoPlayer({ session, media, episode, overlay, onProgress, onEn
   const [error, setError] = useState(false)
   const [needsGesture,setNeedsGesture]=useState(false)
   const [attempt, setAttempt] = useState(0)
+  const firstFrame=useRef(false)
+  const hasAdvanced=useRef(false)
+  const rendererHandler=useRef(onRendererEvent);rendererHandler.current=onRendererEvent
+  useEffect(()=>{
+    firstFrame.current=false
+    hasAdvanced.current=false
+    lastPlaybackTime.current=undefined
+    const el=video.current
+    if(!el||(!requireVideo&&!rendererHandler.current)||!el.requestVideoFrameCallback)return
+    const id=el.requestVideoFrameCallback(()=>{firstFrame.current=true;rendererHandler.current?.('video')})
+    return()=>el.cancelVideoFrameCallback(id)
+  },[attempt])
   const eventHandler = useRef(onPlaybackEvent)
   eventHandler.current = onPlaybackEvent
   const audioFailure = useRef((detail: string) => eventHandler.current?.('failed', 0, detail))
@@ -49,11 +62,28 @@ export function VideoPlayer({ session, media, episode, overlay, onProgress, onEn
   const [interaction,setInteraction]=useState(0)
   const [volume,setVolume]=useState(1)
   const reveal=()=>{setControlsVisible(true);setInteraction(value=>value+1)}
-  useEffect(()=>{if(!integrated||!isPlaying||settingsOpen)return;const timer=setTimeout(()=>{if(!wrapper.current?.querySelector('.web-controls')?.contains(document.activeElement))setControlsVisible(false)},3000);return()=>clearTimeout(timer)},[integrated,isPlaying,settingsOpen,interaction])
+  useEffect(() => {
+    if (!integrated || !isPlaying || settingsOpen) return
+    const timer = setTimeout(() => {
+      if (!wrapper.current?.querySelector('.web-controls :focus-visible')) setControlsVisible(false)
+    }, 3000)
+    return () => clearTimeout(timer)
+  }, [integrated, isPlaying, settingsOpen, interaction])
   const [position, setPosition] = useState(0)
   const [duration, setDuration] = useState(0)
   const [speed, setSpeed] = useState(1)
   const [fullscreenError, setFullscreenError] = useState('')
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === wrapper.current)
+      setSettingsOpen(false)
+      setControlsVisible(true)
+      setInteraction(value => value + 1)
+    }
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange)
+  }, [])
   const [playbackNotice, setPlaybackNotice] = useState('')
   function restorePosition() {
     const el = video.current, previous = resume.current
@@ -71,6 +101,11 @@ export function VideoPlayer({ session, media, episode, overlay, onProgress, onEn
     lastSave.current = Date.now()
     saver.current(media, el.currentTime * 1000, el.duration * 1000, episode)
   }
+  function markPlaybackStarted(el:HTMLVideoElement) {
+    clearMediaFailure(media.id,episode)
+    const entry=state.progress[progressKey(media.id,episode)]
+    if(entry&&isCompleted(entry)&&Number.isFinite(el.duration)&&el.duration>0&&el.currentTime/el.duration<.95)setCompleted(progressKey(media.id,episode),false)
+  }
   // Capture the old element before React detaches it on route/episode changes.
   useLayoutEffect(() => {
     const el = video.current
@@ -85,14 +120,15 @@ export function VideoPlayer({ session, media, episode, overlay, onProgress, onEn
   async function fullscreen() { try { if(document.fullscreenElement===wrapper.current)await document.exitFullscreen();else await wrapper.current?.requestFullscreen(); setFullscreenError('') } catch { setFullscreenError('Use o controle de tela cheia do vídeo neste navegador.') } }
   const togglePlay=()=>{const el=video.current;if(!el)return;reveal();if(el.paused)void el.play().catch(()=>setNeedsGesture(true));else el.pause()}
   const changeVolume=(value:number)=>{if(!video.current)return;const safe=Math.max(0,Math.min(1,value));video.current.volume=safe;video.current.muted=safe===0;setVolume(safe);reveal()}
+  const fullscreenButton = <button aria-label={isFullscreen?'Sair da tela cheia':'Tela cheia'} onClick={()=>{void fullscreen();reveal()}}>{isFullscreen?<Minimize size={18}/>:<Maximize size={18}/>}</button>
   const transport=integrated&&controlsEnabled&&<div className={`web-controls ${controlsVisible?'visible':''}`} aria-hidden={!controlsVisible} inert={!controlsVisible}>
-    <div className="web-controls-top"><button aria-label="Voltar às fontes" onClick={onSources}><ArrowLeft size={20}/></button><span>{session.title}</span><button onClick={onSources}>Servidores</button></div>
+    {!isFullscreen && <div className="web-controls-top"><button aria-label="Voltar às fontes" onClick={onSources}><ArrowLeft size={20}/></button><span>{session.title}</span><button onClick={onSources}>Servidores</button></div>}
     <div className="web-controls-bottom"><input className="web-progress" type="range" aria-label="Progresso do vídeo" min="0" max={Number.isFinite(duration)&&duration>0?duration:1} step="0.1" value={Math.min(position,Number.isFinite(duration)&&duration>0?duration:1)} disabled={!Number.isFinite(duration)||duration<=0} onChange={event=>{if(video.current)video.current.currentTime=Number(event.target.value);reveal()}}/>
-      <div className="web-control-actions"><button aria-label={isPlaying?'Pausar vídeo':'Reproduzir vídeo'} onClick={togglePlay}>{isPlaying?<Pause size={20}/>:<Play size={20}/>}</button><button aria-label="Voltar 10 segundos" onClick={()=>{seek(-10);reveal()}}><RotateCcw size={18}/></button><button aria-label="Avançar 10 segundos" onClick={()=>{seek(10);reveal()}}><RotateCw size={18}/></button><span className="web-time">{formatTime(position)} / {formatTime(duration)}</span><button aria-label={volume?'Silenciar áudio':'Ativar áudio'} onClick={()=>changeVolume(volume?0:1)}>{volume?<Volume2 size={18}/>:<VolumeX size={18}/>}</button><input className="web-volume" type="range" aria-label="Volume" min="0" max="1" step="0.05" value={volume} onChange={event=>changeVolume(Number(event.target.value))}/><button aria-label="Configurações do vídeo" aria-expanded={settingsOpen} onClick={()=>{setSettingsOpen(value=>!value);reveal()}}><Settings size={18}/></button>{typeof document.documentElement.requestFullscreen==='function'&&<button aria-label="Tela cheia" onClick={()=>{void fullscreen();reveal()}}><Maximize size={18}/></button>}</div>
+      <div className="web-control-actions"><button aria-label={isPlaying?'Pausar vídeo':'Reproduzir vídeo'} onClick={togglePlay}>{isPlaying?<Pause size={20}/>:<Play size={20}/>}</button><button aria-label="Voltar 10 segundos" onClick={()=>{seek(-10);reveal()}}><RotateCcw size={18}/></button><button aria-label="Avançar 10 segundos" onClick={()=>{seek(10);reveal()}}><RotateCw size={18}/></button><span className="web-time">{formatTime(position)} / {formatTime(duration)}</span><button aria-label={volume?'Silenciar áudio':'Ativar áudio'} onClick={()=>changeVolume(volume?0:1)}>{volume?<Volume2 size={18}/>:<VolumeX size={18}/>}</button><input className="web-volume" type="range" aria-label="Volume" min="0" max="1" step="0.05" value={volume} onChange={event=>changeVolume(Number(event.target.value))}/><button aria-label="Configurações do vídeo" aria-expanded={settingsOpen} onClick={()=>{setSettingsOpen(value=>!value);reveal()}}><Settings size={18}/></button>{typeof document.documentElement.requestFullscreen==='function'&&fullscreenButton}</div>
     </div>
     {settingsOpen&&<div className="web-player-settings"><label>Volume<input type="range" aria-label="Volume nas configurações" min="0" max="1" step="0.05" value={volume} onChange={event=>changeVolume(Number(event.target.value))}/></label><label>Velocidade<select aria-label="Velocidade de reprodução" value={speed} onChange={event=>{const value=Number(event.target.value);setSpeed(value);if(video.current)video.current.playbackRate=value}}>{[.75,1,1.25,1.5,2].map(value=><option key={value} value={value}>{value}×</option>)}</select></label>{audio.tracks.length>1&&<label>Áudio<select aria-label="Faixa de áudio" onChange={event=>audio.select(Number(event.target.value))}>{audio.tracks.map(track=><option key={track.id} value={track.id}>{track.label}</option>)}</select></label>}{!!audio.subtitles.length&&<label>Legendas<select aria-label="Legendas" defaultValue="-1" onChange={event=>audio.selectSubtitle(Number(event.target.value))}><option value="-1">Desativadas</option>{audio.subtitles.map(track=><option key={track.id} value={track.id}>{track.label}</option>)}</select></label>}</div>}
   </div>
-  return <div className={`video-component ${integrated?'integrated-video':''}`}><div className="video-frame" ref={wrapper} tabIndex={integrated?0:undefined} role={integrated?'group':undefined} aria-label={integrated?`Controles de ${session.title}`:undefined} onPointerMove={event=>{if(integrated&&event.pointerType==='mouse')reveal()}} onFocus={()=>{if(integrated)reveal()}} onClick={event=>{if(integrated&&event.target===video.current){setControlsVisible(value=>!value);setInteraction(value=>value+1)}}} onKeyDown={event=>{if(!integrated||event.target!==wrapper.current)return;if(event.code==='Space'){event.preventDefault();togglePlay()}else if(event.code==='ArrowRight'){event.preventDefault();seek(10);reveal()}else if(event.code==='ArrowLeft'){event.preventDefault();seek(-10);reveal()}}}><video key={attempt} ref={video} controls={!integrated} playsInline preload="metadata" poster={session.poster} aria-label={`Reprodutor de ${session.title}`} onError={() => {
+  return <div className={`video-component ${integrated?'integrated-video':''}`}><div className="video-frame" ref={wrapper} tabIndex={integrated?0:undefined} role={integrated?'group':undefined} aria-label={integrated?`Controles de ${session.title}`:undefined} onPointerMove={event=>{if(integrated&&event.pointerType==='mouse')reveal()}} onFocus={()=>{if(integrated)reveal()}} onBlur={()=>{if(integrated)setInteraction(value=>value+1)}} onClick={event=>{if(integrated&&event.target===video.current){setControlsVisible(value=>!value);setInteraction(value=>value+1)}}} onKeyDown={event=>{if(!integrated||event.target!==wrapper.current)return;if(event.code==='Space'){event.preventDefault();togglePlay()}else if(event.code==='ArrowRight'){event.preventDefault();seek(10);reveal()}else if(event.code==='ArrowLeft'){event.preventDefault();seek(-10);reveal()}}}><video key={attempt} ref={video} controls={!integrated} playsInline preload="metadata" poster={session.poster} aria-label={`Reprodutor de ${session.title}`} onLoadStart={()=>onRendererEvent?.('preparação')} onError={() => {
     save(true)
     onPlaybackEvent?.('failed', 0, `Erro HTML5 de mídia: ${video.current?.error?.code ?? 'não informado'}`)
     setError(true)
@@ -103,9 +139,7 @@ export function VideoPlayer({ session, media, episode, overlay, onProgress, onEn
     restorePosition()
   }} onPlaying={() => {
     setIsPlaying(true);setNeedsGesture(false);onPlaybackEvent?.('playing'); if(!requireVideo||!!video.current?.videoWidth)onStateChange?.('playing')
-    clearMediaFailure(media.id, episode)
-    const previous = state.progress[progressKey(media.id, episode)], el = video.current
-    if (previous && isCompleted(previous) && el && Number.isFinite(el.duration) && el.duration > 0 && el.currentTime / el.duration < .95) setCompleted(progressKey(media.id, episode), false)
+    if(!requireVideo&&video.current)markPlaybackStarted(video.current)
   }} onLoadedMetadata={() => {
     const el = video.current
     if (!el) return
@@ -117,18 +151,28 @@ export function VideoPlayer({ session, media, episode, overlay, onProgress, onEn
   }} onTimeUpdate={() => {
     const el = video.current
     setPosition(el?.currentTime ?? 0); save()
-    if (el && !el.paused && !el.seeking && el.readyState >= 2 && (!requireVideo||el.videoWidth>0)) {
+    const audioBytes=(el as (HTMLVideoElement&{webkitAudioDecodedByteCount?:number})|null)?.webkitAudioDecodedByteCount
+    if(audioBytes)onRendererEvent?.('audio')
+    const visibleVideo=el&&el.videoWidth>0&&(firstFrame.current||typeof el.requestVideoFrameCallback!=='function')
+    if (el && !el.paused && !el.seeking && el.readyState >= 2 && (!requireVideo||visibleVideo)) {
       const previous = lastPlaybackTime.current; lastPlaybackTime.current = el.currentTime
-      if (previous !== undefined && el.currentTime > previous + .05 && el.currentTime - previous < 2) onPlaybackEvent?.('progress', el.currentTime)
+      if (previous !== undefined && el.currentTime > previous + .05 && el.currentTime - previous < 2) {
+        if(requireVideo&&!hasAdvanced.current){
+          hasAdvanced.current=true
+          markPlaybackStarted(el)
+        }
+        if(audioBytes&&firstFrame.current)onRendererEvent?.('reprodução-confirmada',el.currentTime)
+        onPlaybackEvent?.('progress',el.currentTime)
+      }
     } else lastPlaybackTime.current = undefined
     if (el) onProgress?.({ positionSeconds: el.currentTime, durationSeconds: el.duration })
   }} onSeeked={() => {
     save(true)
     const el = video.current
     if (el) onProgress?.({ positionSeconds: el.currentTime, durationSeconds: el.duration })
-  }} onVolumeChange={()=>{if(video.current)setVolume(video.current.muted?0:video.current.volume)}} onPause={() => {setIsPlaying(false);setControlsVisible(true);save(true);onStateChange?.('paused')}} onEnded={() => { if(requireVideo&&!video.current?.videoWidth){onPlaybackEvent?.('failed',0,'NO_VIDEO_OUTPUT');return} save(true); setCompleted(progressKey(media.id, episode), true); onEnded?.() }}>
+  }} onVolumeChange={()=>{if(video.current)setVolume(video.current.muted?0:video.current.volume)}} onPause={() => {setIsPlaying(false);setControlsVisible(true);save(true);onStateChange?.('paused')}} onEnded={() => { if(requireVideo&&!video.current?.videoWidth){onPlaybackEvent?.('failed',0,'NO_VIDEO_OUTPUT');return} save(true); if(persistHistory)setCompleted(progressKey(media.id, episode), true); onEnded?.() }}>
     {session.sources.filter(source => source.type !== 'application/vnd.apple.mpegurl').map(source => <source key={source.src} src={source.src} type={source.type} />)}Seu navegador não suporta vídeo HTML5.
-    </video>{transport}{needsGesture&&!error&&<div className="video-start"><button className="button button-primary" onClick={()=>{void video.current?.play().then(()=>setNeedsGesture(false)).catch(()=>setPlaybackNotice('Toque no controle de reprodução do vídeo para iniciar.'))}}>Iniciar reprodução</button></div>}{!error && overlay}{error && <div className="video-error" role="alert"><h2>Não conseguimos iniciar o vídeo</h2><p>Não foi possível carregar esta fonte. Verifique sua conexão ou tente novamente.</p><button className="button button-primary" onClick={() => {
+    </video>{transport}{!integrated&&isFullscreen&&<div className="web-controls-top standalone-fullscreen-controls">{fullscreenButton}</div>}{needsGesture&&!error&&<div className="video-start"><button className="button button-primary" onClick={()=>{void video.current?.play().then(()=>setNeedsGesture(false)).catch(()=>setPlaybackNotice('Toque no controle de reprodução do vídeo para iniciar.'))}}>Iniciar reprodução</button></div>}{!error && overlay}{error && <div className="video-error" role="alert"><h2>Não conseguimos iniciar o vídeo</h2><p>Não foi possível carregar esta fonte. Verifique sua conexão ou tente novamente.</p><button className="button button-primary" onClick={() => {
       resume.current = state.progress[progressKey(media.id, episode)]; resumed.current = false; lastSave.current = -Infinity
       setError(false); setAttempt(a => a + 1)
     }}>Tentar novamente</button></div>}</div>

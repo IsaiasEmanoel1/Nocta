@@ -1,0 +1,225 @@
+{
+  "at": "2026-11-05T20:19:53.063Z",
+  "titles": [
+    {
+      "category": "filmes",
+      "title": "Resident Evil",
+      "year": 2026,
+      "type": "movie",
+      "tmdb": 1423191,
+      "imdb": "tt35538033",
+      "metadata": "tmdb"
+    },
+    {
+      "category": "filmes",
+      "title": "Hope: O Primeiro Impacto",
+      "year": 2026,
+      "type": "movie",
+      "tmdb": 1058424,
+      "imdb": "tt27369017",
+      "metadata": "tmdb"
+    },
+    {
+      "category": "filmes",
+      "title": "Apocalipse Z: Novo Mundo",
+      "year": 2026,
+      "type": "movie",
+      "tmdb": 1507696,
+      "imdb": "tt37522541",
+      "metadata": "tmdb"
+    },
+    {
+      "category": "filmes",
+      "title": "Primetime",
+      "year": 2026,
+      "type": "movie",
+      "tmdb": 1375441,
+      "imdb": "tt34206385",
+      "metadata": "tmdb"
+    },
+    {
+      "category": "filmes",
+      "title": "Godzilla Minus Zero",
+      "year": 2026,
+      "type": "movie",
+      "tmdb": 1381071,
+      "imdb": "tt34384661",
+      "metadata": "tmdb"
+    },
+    {
+      "category": "filmes",
+      "title": "Fuga Mortal",
+      "year": 2026,
+      "type": "movie",
+      "tmdb": 1294189,
+      "imdb": "tt13611778",
+      "metadata": "tmdb"
+    },
+    {
+      "category": "animacoes",
+      "title": "Procurando Nemo",
+      "year": 2003,
+      "type": "movie",
+      "tmdb": 12,
+      "imdb": "tt0266543",
+      "metadata": "tmdb"
+    },
+    {
+      "category": "animacoes",
+      "title": "Toy Story: Um Mundo de Aventuras",
+      "year": 1996,
+      "type": "movie",
+      "tmdb": 862,
+      "imdb": "tt0114709",
+      "metadata": "tmdb"
+    },
+    {
+      "category": "animacoes",
+      "title": "O Bosque Selvagem",
+      "year": 2026,
+      "type": "movie",
+      "tmdb": 791523,
+      "imdb": "tt2056785",
+      "metadata": "tmdb"
+    },
+    {
+      "category": "animacoes",
+      "title": "Viva: A Vida é Uma Festa",
+      "year": 2018,
+      "type": "movie",
+      "tmdb": 354912,
+      "imdb": "tt2380307",
+      "metadata": "tmdb"
+    },
+    {
+      "category": "series",
+      "title": "O Mentalista",
+      "year": 2008,
+      "type": "series",
+      "tmdb": 5920,
+      "imdb": "tt1196946",
+      "metadata": "tmdb",
+      "season": 1,
+      "episode": 1,
+      "episodeTmdb": 367686,
+      "episodeTitle": "Piloto"
+    },
+    {
+      "category": "series",
+      "title": "Como Eu Conheci Sua Mãe",
+      "year": 2005,
+      "type": "series",
+      "tmdb": 1100,
+      "imdb": "tt0460649",
+      "metadata": "tmdb",
+      "season": 1,
+      "episode": 1,
+      "episodeTmdb": 62756,
+      "episodeTitle": "Piloto"
+    },
+    {
+      "category": "series",
+      "title": "The Office",
+      "year": 2005,
+      "type": "series",
+      "tmdb": 2316,
+      "imdb": "tt0386676",
+      "metadata": "tmdb",
+      "season": 1,
+      "episode": 1,
+      "episodeTmdb": 170135,
+      "episodeTitle": "Piloto"
+    },
+    {
+      "category": "desenhos",
+      "title": "Os Simpsons",
+      "year": 1989,
+      "type": "series",
+      "tmdb": 456,
+      "imdb": "tt0096697",
+      "metadata": "tmdb",
+      "season": 1,
+      "episode": 1,
+      "episodeTmdb": 62228,
+      "episodeTitle": "O Prêmio de Natal"
+    },
+    {
+      "category": "desenhos",
+      "title": "A Lenda de Korra",
+      "year": 2012,
+      "type": "series",
+      "tmdb": 33880,
+      "imdb": "tt1695360",
+      "metadata": "tmdb",
+      "season": 1,
+      "episode": 1,
+      "episodeTmdb": 779556,
+      "episodeTitle": "Bem-Vindo a Cidade da República"
+    },
+    {
+      "category": "desenhos",
+      "title": "Star vs. As Forças do Mal",
+      "year": 2015,
+      "type": "series",
+      "tmdb": 61923,
+      "imdb": "tt2758770",
+      "metadata": "tmdb",
+      "season": 1,
+      "episode": 1,
+      "episodeTmdb": 1037985,
+      "episodeTitle": "Star Viaja para a Terra"
+    },
+    {
+      "category": "animes",
+      "title": "Mob Psycho 100",
+      "year": 2016,
+      "type": "series",
+      "tmdb": 67075,
+      "imdb": "tt5897304",
+      "metadata": "tmdb",
+      "season": 1,
+      "episode": 1,
+      "episodeTmdb": 1205175,
+      "episodeTitle": "Autointitulado Paranormal: Arataka Reigen ~e Mob~"
+    },
+    {
+      "category": "animes",
+      "title": "WANDANCE",
+      "year": 2025,
+      "type": "series",
+      "tmdb": 262259,
+      "imdb": "tt34714068",
+      "metadata": "tmdb",
+      "season": 1,
+      "episode": 1,
+      "episodeTmdb": 5541866,
+      "episodeTitle": "A Dança da Wanda"
+    },
+    {
+      "category": "novelas",
+      "title": "Malhação",
+      "year": 1995,
+      "type": "series",
+      "tmdb": 14424,
+      "imdb": "tt0144724",
+      "metadata": "tmdb",
+      "season": 1,
+      "episode": 1,
+      "episodeTmdb": 1642456,
+      "episodeTitle": "Capítulo 1"
+    },
+    {
+      "category": "novelas",
+      "title": "O Rei do Gado",
+      "year": 1996,
+      "type": "series",
+      "tmdb": 41731,
+      "imdb": "tt0138257",
+      "metadata": "tmdb",
+      "season": 1,
+      "episode": 1,
+      "episodeTmdb": 1768884,
+      "episodeTitle": "Capítulo 1"
+    }
+  ]
+}

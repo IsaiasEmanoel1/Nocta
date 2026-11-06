@@ -1,4 +1,4 @@
-import { Link } from 'react-router'
+import { Link,useLocation } from 'react-router'
 import { Bookmark, Check, Play, Star, Info } from 'lucide-react'
 import type { Media } from '../domain/media'
 import { mediaPath } from '../domain/media'
@@ -12,13 +12,14 @@ export function SafeImage({ src, alt, className = '', loading = 'lazy' }: { src:
 export function MediaCard({ media, rank, episode }: { media: Media; rank?: number; episode?: EpisodeSelection }) {
   const { isFavorite, toggleFavorite } = useLibrary()
   const favorite = isFavorite(media.id)
-  return <article className="media-card group"><div className="poster-wrap"><Link state={{media}} to={playbackPath(media.id, episode)} className="poster-link" aria-label={`Assistir ${media.title}`}><SafeImage src={media.poster} alt={`Cartaz de ${media.title}`} />
+  const location=useLocation();const navigationState={media,returnTo:location.pathname+location.search}
+  return <article className="media-card group"><div className="poster-wrap"><Link state={navigationState} to={playbackPath(media.id, episode)} className="poster-link" aria-label={`Assistir ${media.title}`}><SafeImage src={media.poster} alt={`Cartaz de ${media.title}`} />
     <div className="poster-shade" /><span className="card-view"><Play size={24} fill="currentColor" /></span></Link>
     {rank && <span className="rank-number">{String(rank).padStart(2, '0')}</span>}
     {media.source === 'licensed-demo' ? <span className="poster-badge demo-badge"><Play size={10} fill="currentColor" /> DEMO</span> : media.kind === 'tv' && <span className="poster-badge">SÉRIE</span>}
     <button className={`card-save ${favorite ? 'saved' : ''}`} aria-label={favorite ? `Remover ${media.title} da lista` : `Adicionar ${media.title} à lista`} aria-pressed={favorite} onClick={() => toggleFavorite(media)}>{favorite ? <Check size={17} /> : <Bookmark size={17} />}</button>
-    </div><Link state={{media}} to={playbackPath(media.id, episode)} className="card-title">{media.title}</Link><div className="card-meta"><span>{media.year || 'Em breve'}</span><span className="meta-dot">·</span><span>{media.genres[0] ?? (media.kind === 'tv' ? 'Série' : 'Filme')}</span>{media.rating > 0 && <span className="card-rating"><Star size={11} fill="currentColor" />{media.rating.toFixed(1)}</span>}</div>
+    </div><Link state={navigationState} to={playbackPath(media.id, episode)} className="card-title">{media.title}</Link><div className="card-meta"><span>{media.year || 'Em breve'}</span><span className="meta-dot">·</span><span>{media.genres[0] ?? (media.kind === 'tv' ? 'Série' : 'Filme')}</span>{media.rating > 0 && <span className="card-rating"><Star size={11} fill="currentColor" />{media.rating.toFixed(1)}</span>}</div>
     {episode && <p className="card-episode-label">T{episode.seasonNumber} · Episódio {episode.episodeNumber}</p>}
-    <Link to={mediaPath(media)} className="card-details" aria-label={`Ver detalhes de ${media.title}`}><Info size={13} aria-hidden="true" />Detalhes</Link>
+    <Link state={navigationState} to={mediaPath(media)} className="card-details" aria-label={`Ver detalhes de ${media.title}`}><Info size={13} aria-hidden="true" />Detalhes</Link>
   </article>
 }

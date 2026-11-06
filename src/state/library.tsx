@@ -3,10 +3,12 @@ import type { PropsWithChildren } from 'react'
 import type { Media } from '../domain/media'
 import { progressKey, validSelection } from '../domain/episodes'
 import type { EpisodeSelection } from '../domain/episodes'
+import {readPlaybackPreference} from '../domain/playbackResume'
+import type {PlaybackPreference} from '../domain/playbackResume'
 
-interface HistoryBase { media: Media; updatedAt: number; episode?: EpisodeSelection; completed?: boolean }
+interface HistoryBase { media: Media; updatedAt: number; episode?: EpisodeSelection; completed?: boolean; preference?:PlaybackPreference }
 export interface WatchProgress extends HistoryBase { playbackType?: 'html5'; positionMs: number; durationMs: number }
-export interface IframeHistory extends HistoryBase { playbackType: 'iframe' }
+export interface IframeHistory extends HistoryBase { playbackType: 'iframe'; lastKnownProgress?:{positionMs:number;durationMs:number} }
 export type HistoryEntry = WatchProgress | IframeHistory
 export interface LibraryState { version: 2; favorites: Media[]; progress: Record<string, HistoryEntry> }
 export const STORAGE_KEY = 'nocta.library.v2'
@@ -27,6 +29,7 @@ function mediaSnapshot(value: unknown): Media | null {
     source: ['tmdb', 'fiction', 'licensed-demo'].includes(item.source) ? item.source : item.id.startsWith('tmdb-') ? 'tmdb' : 'fiction' }
 }
 export function isTimedProgress(entry: HistoryEntry): entry is WatchProgress { return entry.playbackType !== 'iframe' }
+export function knownProgress(entry?:HistoryEntry){return entry?(isTimedProgress(entry)?{positionMs:entry.positionMs,durationMs:entry.durationMs}:entry.lastKnownProgress):undefined}
 export function isCompleted(entry: HistoryEntry): boolean { return entry.completed ?? (isTimedProgress(entry) && entry.positionMs / entry.durationMs >= .95) }
 export function resumable(entry: HistoryEntry): boolean { return !isCompleted(entry) && (!isTimedProgress(entry) || entry.positionMs >= 1000) }
 export function readLibrary(storage: Pick<Storage, 'getItem'> | null): LibraryState {
@@ -42,8 +45,9 @@ export function readLibrary(storage: Pick<Storage, 'getItem'> | null): LibrarySt
         const p = entry as HistoryEntry
         const media = mediaSnapshot(p.media)
         if (!media || (p.episode !== undefined && !validSelection(p.episode)) || progressKey(media.id, p.episode) !== id) continue
-        const base = { media, updatedAt: Number.isFinite(p.updatedAt) && p.updatedAt >= 0 ? p.updatedAt : 0, ...(p.episode ? { episode: p.episode } : {}), ...(typeof p.completed === 'boolean' ? { completed: p.completed } : {}) }
-        if (p.playbackType === 'iframe') progress[id] = { ...base, playbackType: 'iframe' }
+        const preference=readPlaybackPreference(p.preference)
+        const base = { media, updatedAt: Number.isFinite(p.updatedAt) && p.updatedAt >= 0 ? p.updatedAt : 0, ...(p.episode ? { episode: p.episode } : {}), ...(typeof p.completed === 'boolean' ? { completed: p.completed } : {}),...(preference?{preference}:{}) }
+        if (p.playbackType === 'iframe') {const checkpoint=p.lastKnownProgress;progress[id] = { ...base, playbackType: 'iframe',...(checkpoint&&Number.isFinite(checkpoint.positionMs)&&Number.isFinite(checkpoint.durationMs)&&checkpoint.positionMs>=0&&checkpoint.durationMs>0?{lastKnownProgress:{positionMs:Math.min(checkpoint.positionMs,checkpoint.durationMs),durationMs:checkpoint.durationMs}}:{}) }}
         else if ((p.playbackType === undefined || p.playbackType === 'html5') && Number.isFinite(p.positionMs) && p.positionMs >= 0 && Number.isFinite(p.durationMs) && p.durationMs > 0) progress[id] = { ...base, positionMs: Math.min(p.positionMs, p.durationMs), durationMs: p.durationMs, ...(p.playbackType === 'html5' ? { playbackType: 'html5' as const } : {}) }
       }
       const seen = new Set<string>()
@@ -57,6 +61,7 @@ interface LibraryContextValue {
   state: LibraryState; isFavorite(id: string): boolean; toggleFavorite(media: Media): void
   saveProgress(media: Media, positionMs: number, durationMs: number, episode?: EpisodeSelection): void
   recordIframeOpen(media: Media, episode?: EpisodeSelection): void
+  savePlaybackPreference(media:Media,preference:PlaybackPreference,episode?:EpisodeSelection):boolean
   setCompleted(id: string, completed: boolean): void
   removeMediaHistory(id: string): void
   removeProgress(id: string): void; clearHistory(): void; toast: string; storageError: boolean
@@ -93,13 +98,17 @@ export function LibraryProvider({ children }: PropsWithChildren) {
       const key = progressKey(media.id, episode), previous = s.progress[key]
       const position = Math.min(positionMs, durationMs)
       if (previous && isTimedProgress(previous) && previous.positionMs === position && previous.durationMs === durationMs) return s
-      return { ...s, progress: { ...s.progress, [key]: { media, playbackType: 'html5', positionMs: position, durationMs, updatedAt: Date.now(), completed: previous?.completed === true || position / durationMs >= .95, ...(episode ? { episode } : {}) } } }
+      return { ...s, progress: { ...s.progress, [key]: { media, playbackType: 'html5', positionMs: position, durationMs, updatedAt: Date.now(), completed: previous?.completed === true || position / durationMs >= .95, ...(episode ? { episode } : {}),...(previous?.preference?{preference:previous.preference}:{}) } } }
     })
   }, [commit])
   const recordIframeOpen = useCallback((media: Media, episode?: EpisodeSelection) => {
     if (episode && !validSelection(episode)) return
-    commit(s => ({ ...s, progress: { ...s.progress, [progressKey(media.id, episode)]: { media, playbackType: 'iframe', updatedAt: Date.now(), completed: false, ...(episode ? { episode } : {}) } } }))
+    commit(s => {const key=progressKey(media.id,episode),previous=s.progress[key],checkpoint=knownProgress(previous);return { ...s, progress: { ...s.progress, [key]: { media, playbackType: 'iframe', updatedAt: Date.now(), completed: false, ...(episode ? { episode } : {}),...(previous?.preference?{preference:previous.preference}:{}),...(checkpoint?{lastKnownProgress:checkpoint}:{}) } } }})
   }, [commit])
+  const savePlaybackPreference=useCallback((media:Media,value:PlaybackPreference,episode?:EpisodeSelection)=>{
+    const preference=readPlaybackPreference(value),key=progressKey(media.id,episode);if(!preference||!current.current.progress[key])return false
+    return commit(s=>{const previous=s.progress[key];if(!previous)return s;if(JSON.stringify(previous.preference)===JSON.stringify(preference))return s;return {...s,progress:{...s.progress,[key]:{...previous,preference}}}})
+  },[commit])
   const setCompleted = useCallback((id: string, completed: boolean) => commit(s => {
     const previous = s.progress[id]
     if (!previous || previous.completed === completed) return s
@@ -115,7 +124,7 @@ export function LibraryProvider({ children }: PropsWithChildren) {
     if (commit(s => ({ ...s, progress: Object.fromEntries(Object.entries(s.progress).filter(([, entry]) => entry.media.id !== id)) }))) discardLegacyBackup()
   }, [commit, discardLegacyBackup])
   const clearHistory = useCallback(() => { if (commit(s => ({ ...s, progress: {} }))) discardLegacyBackup() }, [commit, discardLegacyBackup])
-  return <LibraryContext.Provider value={{ state, toggleFavorite, isFavorite: id => state.favorites.some(media => media.id === id), saveProgress, recordIframeOpen, setCompleted, removeProgress, removeMediaHistory, clearHistory, toast, storageError }}>
+  return <LibraryContext.Provider value={{ state, toggleFavorite, isFavorite: id => state.favorites.some(media => media.id === id), saveProgress, recordIframeOpen, savePlaybackPreference, setCompleted, removeProgress, removeMediaHistory, clearHistory, toast, storageError }}>
     {children}<div role="status" className={`toast ${toast ? 'visible' : ''}`}>{toast}</div>
     {storageError && <div className="storage-warning" role="status">Seu navegador bloqueou o armazenamento. Sua lista dura apenas nesta sessão.</div>}
   </LibraryContext.Provider>

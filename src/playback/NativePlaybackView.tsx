@@ -20,10 +20,15 @@ export function NativePlaybackView({input,nextAvailable,onEvent,onResume,onRelea
     if(disposed){cleanup();return}
     const inputFingerprint=await nativeInputFingerprint(input).catch(()=>undefined)
     if(disposed)return
-    await nativePlaybackEngine.load({...input,inline:true,bounds:measure(),sessionId:lease,inputFingerprint})
+    const cacheableUrl=import.meta.env.VITE_NOCTA_CACHEABLE_MEDIA_URL?.trim()
+    await nativePlaybackEngine.load({...input,inline:true,bounds:measure(),sessionId:lease,inputFingerprint,mediaDiskCache:!!cacheableUrl&&input.url===cacheableUrl})
     if(!disposed)await configureNativeControls(lease,next.current,measure()).catch(()=>{})
     if(disposed)await nativePlaybackEngine.close(lease)
-   }catch{if(!disposed)handler.current({sessionId:input.sessionId,event:'failed',positionSeconds:0,detail:'INITIALIZATION_EXCEPTION'})}
+   }catch(error){
+    const code=(error as {code?:unknown}|null)?.code
+    const networkCause=code==='header-policy'||code==='destination-policy'?code:undefined
+    if(!disposed)handler.current({sessionId:input.sessionId,event:'failed',positionSeconds:0,detail:'INITIALIZATION_EXCEPTION',...(networkCause?{category:'network',networkCause,mediaStage:'client-configuration'}:{})})
+   }
   })()
   const background=()=>{void nativePlaybackEngine.pause()}
   window.addEventListener(APP_BACKGROUND_EVENT,background)
@@ -31,13 +36,14 @@ export function NativePlaybackView({input,nextAvailable,onEvent,onResume,onRelea
  },[input.sessionId])
  useEffect(()=>{if(nativeSession.current)void configureNativeControls(nativeSession.current,nextAvailable,measure()).catch(()=>{})},[input.sessionId,nextAvailable])
  useEffect(()=>{
-  let timer:ReturnType<typeof setTimeout>|undefined
-  const update=()=>{if(timer)clearTimeout(timer);timer=setTimeout(()=>{if(nativeSession.current)void configureNativeControls(nativeSession.current,next.current,measure()).catch(()=>{})},40)}
+  let frameId=0,dirty=false,inFlight=false,live=true
+  const flush=async()=>{frameId=0;if(!live||!dirty||!nativeSession.current)return;dirty=false;inFlight=true;try{await configureNativeControls(nativeSession.current,next.current,measure())}catch{}finally{inFlight=false;if(live&&dirty)update()}}
+  const update=()=>{dirty=true;if(!frameId&&!inFlight)frameId=requestAnimationFrame(()=>{void flush()})}
   const observer=typeof ResizeObserver!=='undefined'?new ResizeObserver(update):undefined;if(frame.current)observer?.observe(frame.current)
-  window.addEventListener('resize',update);window.addEventListener('scroll',update,true)
-  return()=>{if(timer)clearTimeout(timer);observer?.disconnect();window.removeEventListener('resize',update);window.removeEventListener('scroll',update,true)}
+  window.addEventListener('resize',update);window.addEventListener('scroll',update,{capture:true,passive:true});window.visualViewport?.addEventListener('resize',update)
+  return()=>{live=false;if(frameId)cancelAnimationFrame(frameId);observer?.disconnect();window.removeEventListener('resize',update);window.removeEventListener('scroll',update,true);window.visualViewport?.removeEventListener('resize',update)}
  },[input.sessionId])
- return <div ref={frame} className="native-playback-host" style={{width:'100%',aspectRatio:'16 / 9',position:'relative'}}> {closed&&<p>A reprodução foi fechada.</p>}{closed&&<button className="button button-primary" onClick={onResume}>Continuar reprodução</button>}</div>
+ return <div ref={frame} className="native-playback-host" style={{width:'100%',height:'100%',position:'relative'}}> {closed&&<p>A reprodução foi fechada.</p>}{closed&&<button className="button button-primary" onClick={onResume}>Continuar reprodução</button>}</div>
 }
 
 /** A monotonic startup/stall budget; pauses and background never trigger source switching. */

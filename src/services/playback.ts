@@ -1,5 +1,5 @@
-import { availabilityMessage, availabilityService } from './availability'
-import type { AvailabilityService } from './availability'
+import { availabilityMessage, embedAvailabilityService } from './availability'
+import type { AvailabilityService,AvailabilityRecord } from './availability'
 import { validSelection } from '../domain/episodes'
 export interface PlaybackRequest { mediaId: string; episodeId?: number; episodeNumber?: number; seasonNumber?: number }
 export interface PlaybackSource { src: string; type: 'video/mp4' | 'video/webm' | 'application/vnd.apple.mpegurl' }
@@ -15,6 +15,7 @@ export interface PlaybackSession {
   capabilities?: PlaybackCapabilities;
   isIframe?: boolean;
   iframeUrl?: string;
+  availability?:AvailabilityRecord;
 }
 export interface PlaybackProvider {
   resolve(request: PlaybackRequest, signal?: AbortSignal): Promise<PlaybackSession | null>
@@ -79,7 +80,8 @@ export class HybridPlaybackProvider extends DemoPlaybackProvider {
         attribution: 'Conteúdo incorporado via MyEmbed.',
         license: { name: 'MyEmbed Player', url: 'https://myembed.biz', projectUrl: 'https://myembed.biz' },
         isIframe: true, capabilities: IFRAME_CAPABILITIES,
-        iframeUrl: embedUrl
+        iframeUrl: embedUrl,
+        availability:await embedAvailabilityService.check({mediaId:request.mediaId,...(kind==='tv'?{episode:{seasonNumber:season,episodeNumber:episode}}:{})})
       }
     }
 

@@ -20,17 +20,17 @@ export function EpisodePicker({ media, provider, current, pending, previous, nex
   const seasons = media.seasons?.filter(item => positiveNumber(item.number)).sort((a, b) => a.number - b.number) ?? []
   const episodes = playableEpisodes(data?.data ?? [])
   return <section className="watch-episodes" aria-labelledby="watch-episodes-title">
-    <div className="watch-episodes-heading"><div><p className="eyebrow">CONTINUE A HISTÓRIA</p><h2 id="watch-episodes-title">Episódios</h2></div>
+    <div className="watch-episodes-heading"><div><p className="eyebrow">Em exibição · T{current.seasonNumber} E{current.episodeNumber}</p><h2 id="watch-episodes-title">Episódios</h2></div>
       <label className="watch-season"><span className="sr-only">Selecionar temporada no player</span>
         <select value={season} onChange={event => setSeason(Number(event.target.value))}>
           {seasons.length ? seasons.map(item => <option key={item.number} value={item.number}>Temporada {item.number}</option>) : <option value={season}>Temporada {season}</option>}
         </select><ChevronDown size={16} aria-hidden="true" />
       </label>
     </div>
-    <div className="watch-episode-current"><span>Em exibição · T{current.seasonNumber} · E{current.episodeNumber}</span>
-      {previous && <button className="button button-secondary" disabled={busy} onClick={() => onSelect(previous)}><ArrowLeft size={16} aria-hidden="true" />Anterior</button>}
-      {next && <button className="button button-secondary" disabled={busy} onClick={() => onSelect(next)}>Próximo episódio <ArrowRight size={16} aria-hidden="true" /></button>}
-    </div>
+    {(previous || next) && <nav className="watch-episode-navigation" aria-label="Navegação de episódios">
+      {previous && <button className="button button-secondary episode-previous" disabled={busy} onClick={() => onSelect(previous)}><ArrowLeft size={16} aria-hidden="true" />Anterior</button>}
+      {next && <button className="button button-secondary episode-next" disabled={busy} onClick={() => onSelect(next)}>Próximo episódio <ArrowRight size={16} aria-hidden="true" /></button>}
+    </nav>}
     {supportsProgress && <label className="watch-autonext"><input type="checkbox" checked={autoAdvance} onChange={event => onAutoAdvanceChange(event.target.checked)} />Reproduzir próximo episódio automaticamente</label>}
     {loading ? <p role="status" className="muted">Carregando episódios…</p> : episodes.length ? <ol className="watch-episode-list">
       {episodes.map(episode => {

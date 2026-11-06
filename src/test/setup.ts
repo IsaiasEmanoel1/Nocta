@@ -6,6 +6,6 @@ import { afterEach, beforeEach, vi } from 'vitest'
 vi.stubEnv('VITE_TMDB_API_KEY', '')
 // JSDOM has no media engine; pausing on unmount is checked separately with real players.
 beforeEach(() => { vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {}) })
-afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); localStorage.clear(); window.history.replaceState({}, '', '/') })
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); localStorage.clear(); sessionStorage.clear(); window.history.replaceState({}, '', '/') })
 window.scrollTo = vi.fn()
 HTMLElement.prototype.scrollBy = vi.fn()

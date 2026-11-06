@@ -1,5 +1,7 @@
 # NOCTA — recuperação e experiência de reprodução
 
+> Incremento posterior de 05/11/2026: [fluxo, tamanho, servidores, retomada e Busca](NOCTA_PLAYER_FLUXO_CACHE.md). A implementação atual não possui a confirmação intermediária do EmbedMovies e deixa Zeus desativado por padrão. Os resultados abaixo registram a etapa anterior.
+
 Atualizado em 05/11/2026. Projeto: `C:\Users\PC\Desktop\fuzz`.
 
 ## Resultado

@@ -77,3 +77,6 @@ export const availabilityService: AvailabilityService = new CachedAvailabilitySe
   isMediaUnavailable(request.mediaId, request.episode)
     ? { status: 'unavailable', source: 'observed-media-failure', ttlMs: 10000 }
     : { status: 'unknown', source: 'embedmovies-no-documented-inventory', ttlMs: 60000 })
+
+// Separate from failures of other sources: an addon error is not evidence against this iframe.
+export const embedAvailabilityService:AvailabilityService=new CachedAvailabilityService(async()=>({status:'unknown',source:'embedmovies-no-documented-inventory',ttlMs:60000}))

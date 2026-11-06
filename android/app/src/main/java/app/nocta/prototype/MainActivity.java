@@ -17,6 +17,7 @@ public class MainActivity extends BridgeActivity {
     private FrameLayout fullscreen;
     private WebChromeClient.CustomViewCallback fullscreenCallback;
     private OnBackPressedCallback fullscreenBack;
+    private PlayerImmersiveMode immersiveMode;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -35,7 +36,7 @@ public class MainActivity extends BridgeActivity {
                 fullscreen.setBackgroundColor(Color.BLACK);
                 fullscreen.addView(view, new FrameLayout.LayoutParams(-1, -1));
                 ViewCompat.setOnApplyWindowInsetsListener(fullscreen, (v, insets) -> {
-                    Insets safe = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+                    Insets safe = insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.displayCutout());
                     v.setPadding(safe.left, safe.top, safe.right, safe.bottom);
                     return insets;
                 });
@@ -43,6 +44,7 @@ public class MainActivity extends BridgeActivity {
                 ViewCompat.requestApplyInsets(fullscreen);
                 bridge.getWebView().setVisibility(View.INVISIBLE);
                 fullscreenBack.setEnabled(true);
+                immersiveMode = new PlayerImmersiveMode(getWindow());
             }
             @Override public void onHideCustomView() { closeFullscreen(); }
         });
@@ -52,10 +54,20 @@ public class MainActivity extends BridgeActivity {
         if (fullscreen == null) return;
         ((ViewGroup) fullscreen.getParent()).removeView(fullscreen);
         fullscreen = null;
+        if (immersiveMode != null) {
+            immersiveMode.restore();
+            immersiveMode = null;
+        }
         bridge.getWebView().setVisibility(View.VISIBLE);
         fullscreenBack.setEnabled(false);
         WebChromeClient.CustomViewCallback callback = fullscreenCallback;
         fullscreenCallback = null;
         if (callback != null) callback.onCustomViewHidden();
+    }
+
+    @Override
+    public void onDestroy() {
+        closeFullscreen();
+        super.onDestroy();
     }
 }

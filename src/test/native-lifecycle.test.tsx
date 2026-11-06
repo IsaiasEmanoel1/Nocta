@@ -1,5 +1,5 @@
 import {StrictMode} from 'react'
-import {act,cleanup,render,waitFor} from '@testing-library/react'
+import {act,cleanup,render,waitFor,fireEvent} from '@testing-library/react'
 import {afterEach,beforeEach,expect,it,vi} from 'vitest'
 import type {PlayerEvent} from '../experimental/playbackEngine'
 const mock=vi.hoisted(()=>({load:vi.fn(),close:vi.fn(),controls:vi.fn(),listeners:[] as ((e:PlayerEvent)=>void)[]}))
@@ -8,7 +8,7 @@ vi.mock('../experimental/nativeAttempt',()=>({nativeInputFingerprint:async()=>{t
 import {NativePlaybackView} from '../playback/NativePlaybackView'
 const input={url:'asset:///native-fixtures/sample.mp4',mimeType:'video/mp4',sessionId:'normal-session'}
 beforeEach(()=>{mock.listeners=[];mock.load.mockReset().mockResolvedValue(undefined);mock.close.mockReset().mockResolvedValue(undefined);mock.controls.mockReset().mockRejectedValue(Error('Optional controls unavailable'))})
-afterEach(cleanup)
+afterEach(()=>{cleanup();vi.useRealTimers()})
 it('optional controls and digest failures cannot turn successful media loading into fallback',async()=>{
  const events=vi.fn();render(<NativePlaybackView input={input} nextAvailable onResume={()=>{}} onEvent={events}/>);await waitFor(()=>expect(mock.load).toHaveBeenCalledOnce());await waitFor(()=>expect(mock.controls).toHaveBeenCalled());expect(events).not.toHaveBeenCalledWith(expect.objectContaining({event:'failed'}))
  const lease=mock.load.mock.calls[0][0].sessionId;expect(lease).not.toBe(input.sessionId)
@@ -20,4 +20,7 @@ it('a disposed native view cannot close a newer lease or forward old callbacks',
 })
 it('StrictMode remounts keep native cleanup scoped to its lease',async()=>{
  const events=vi.fn();render(<StrictMode><NativePlaybackView input={input} nextAvailable={false} onResume={()=>{}} onEvent={events}/></StrictMode>);await waitFor(()=>expect(mock.load).toHaveBeenCalledOnce());const activeLease=mock.load.mock.calls[0][0].sessionId;expect(mock.close.mock.calls.every(([lease])=>lease!==activeLease)).toBe(true)
+})
+it('updates native bounds during continuous scroll instead of waiting until scrolling stops, without recreating playback',async()=>{
+ mock.controls.mockResolvedValue(undefined);render(<NativePlaybackView input={input} nextAvailable={false} onResume={()=>{}} onEvent={()=>{}}/>);await waitFor(()=>expect(mock.load).toHaveBeenCalledOnce());const initial=mock.controls.mock.calls.length;vi.useFakeTimers();for(let i=0;i<6;i++){fireEvent.scroll(window);await act(()=>vi.advanceTimersByTimeAsync(17))}expect(mock.controls.mock.calls.length).toBeGreaterThan(initial+1);expect(mock.load).toHaveBeenCalledOnce()
 })

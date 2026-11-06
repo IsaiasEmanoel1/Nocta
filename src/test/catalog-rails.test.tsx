@@ -6,10 +6,21 @@ import { TmdbCatalogProvider, mapTmdb } from '../services/catalog'
 import { CatalogRequestCache } from '../services/catalogCache'
 import { Home } from '../pages/Home'
 import { LibraryProvider } from '../state/library'
+import { recommendationInterests, recommendationRails, rankRecommendations } from '../domain/recommendations'
 import type { CatalogProvider, CatalogResult, CatalogRail } from '../domain/media'
 
 const record = (id = 1) => ({ id, title: `Filme ${id}`, name: `Série ${id}`, release_date: '2026-01-01', first_air_date: '2026-01-01', poster_path: '/valid.jpg', media_type: 'movie' })
 const film = mapTmdb(record(), 'movie')
+it('weights watched genres above a title merely opened and builds anime discovery from TMDB tags',()=>{
+  const anime={...mapTmdb(record(2),'tv'),genreIds:[16],originalLanguage:'ja'}
+  const soap={...mapTmdb(record(3),'tv'),genreIds:[10766]}
+  const interests=recommendationInterests({version:2,favorites:[],progress:{
+    anime:{media:anime,positionMs:50000,durationMs:60000,updatedAt:1000},
+    soap:{media:soap,playbackType:'iframe',updatedAt:1000},
+  }},undefined,1000)
+  expect(recommendationRails(interests)[0]).toMatchObject({id:'taste-tv-anime',genres:[16],params:{with_original_language:'ja'}})
+  expect(rankRecommendations([anime,soap],[soap,film],interests,new Set([anime.id])).map(item=>item.id)).toEqual([soap.id,film.id])
+})
 it('selects exclusive movie/tv rails, separate genres, soap classification and stable browse contexts', () => {
   expect(catalogRailSpecs('movie').every(spec => spec.mediaType === 'movie')).toBe(true)
   expect(catalogRailSpecs('tv').every(spec => spec.mediaType === 'tv')).toBe(true)

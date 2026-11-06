@@ -23,6 +23,7 @@ export function AndroidLifecycle() {
       } catch { console.warn('Não foi possível ativar um evento Android.') }
     }
     void keep(NativeApp.addListener('backButton', async () => {
+      const dialog=document.querySelector<HTMLDialogElement>('dialog[open]');if(dialog){const event=new Event('cancel',{cancelable:true});dialog.dispatchEvent(event);if(!event.defaultPrevented)dialog.close();return}
       if (document.fullscreenElement) {
         try { await document.exitFullscreen() } catch { /* Native custom-view handles its own Back. */ }
         return

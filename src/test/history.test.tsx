@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import type { CatalogProvider, Media, MediaKind } from '../domain/media'
 import type { PlaybackProvider, PlaybackSession } from '../services/playback'
 import { progressKey } from '../domain/episodes'
-import { LEGACY_STORAGE_KEY, LibraryProvider, readLibrary, STORAGE_KEY, useLibrary } from '../state/library'
+import { LEGACY_STORAGE_KEY, LibraryProvider, readLibrary, STORAGE_KEY, useLibrary,knownProgress } from '../state/library'
 import { ContinueWatching } from '../components/ContinueWatching'
 import { VideoPlayer } from '../components/VideoPlayer'
 import { APP_BACKGROUND_EVENT } from '../components/AndroidLifecycle'
@@ -46,6 +46,12 @@ function ready(container: HTMLElement, seconds = 100) {
 }
 
 describe('Migração e persistência do histórico', () => {
+  it('restores a source preference without storing URLs and preserves real time across an iframe fallback',()=>{
+    mount(<ContinueWatching/>);act(()=>library.saveProgress(series,45000,300000,second));const preference={providerId:'fenixflix' as const,sourceKey:'fenixflix:ab12',engine:'native' as const,format:'matroska' as const,language:'dub' as const,savedAt:Date.now()};act(()=>library.savePlaybackPreference(series,preference,second));act(()=>library.recordIframeOpen(series,second));const restored=readLibrary(localStorage).progress[episodeKey(2)];expect(restored.preference).toEqual(preference);expect(restored.playbackType).toBe('iframe');expect(knownProgress(restored)).toEqual({positionMs:45000,durationMs:300000});expect(restored).not.toHaveProperty('positionMs');expect(document.querySelector('.progress-track')).toBeNull();act(()=>library.saveProgress(series,46000,300000,second));expect(persisted().progress[episodeKey(2)].preference).toEqual(preference)
+  })
+  it('drops invalid/URL-bearing resume identifiers while keeping the existing title/episode and position',()=>{
+    localStorage.setItem(STORAGE_KEY,JSON.stringify({version:2,favorites:[],progress:{[episodeKey(2)]:{...timed(series),episode:second,preference:{providerId:'fenixflix',sourceKey:'https://example.test/private?token=secret',engine:'native',format:'hls',language:'dub',savedAt:1}}}}));const restored=readLibrary(localStorage);expect(restored.progress[episodeKey(2)]).not.toHaveProperty('preference');expect(restored.progress[episodeKey(2)]).toMatchObject({positionMs:20000,episode:second})
+  })
   it('migrates v1 without changing its backup, deduplicates favorites and drops broken entries', () => {
     const legacy = JSON.stringify({ version: 1, favorites: [movie, movie, null], progress: {
       [movie.id]: timed(), [episodeKey(1)]: { ...timed(series), episode: first },

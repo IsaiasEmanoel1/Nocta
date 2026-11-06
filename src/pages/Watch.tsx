@@ -1,5 +1,6 @@
 import { PlayerStage } from '../playback/PlayerStage'
 import { AutomaticWatch } from '../playback/AutomaticWatch'
+import { confirmedPlaybackMedia } from '../playback/providers'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams, useLocation } from 'react-router'
 import { ArrowRight, Play, X } from 'lucide-react'
@@ -28,11 +29,12 @@ export function Watch({ provider = playbackProvider, catalogProvider = catalog }
   const { id = '' } = useParams()
   const location=useLocation()
   const { state: library } = useLibrary()
-  const { data, loading } = useAsync(signal => catalogProvider.detail(id, signal), [id, catalogProvider])
+  const warm = provider === playbackProvider && catalogProvider === catalog ? confirmedPlaybackMedia(id) : undefined
+  const { data, loading } = useAsync(signal => warm ? Promise.resolve({data:warm,origin:'tmdb' as const}) : catalogProvider.detail(id, signal), [id, provider, catalogProvider])
   const saved = Object.values(library.progress).find(item => item.media.id === id)?.media
   const preview=location.state?.media?.id===id?location.state.media as Media:saved??library.favorites.find(item=>item.id===id)
-  if (loading) return <div className="page-shell watch-page automatic-watch"><BackLink>Voltar</BackLink><PlayerStage media={preview} loading token={id} message="Preparando sua reprodução…"/></div>
-  const media = (data?.data?.id === id ? data.data : undefined) ?? saved ?? library.favorites.find(item => item.id === id)
+  if (loading && !warm) return <div className="page-shell watch-page automatic-watch"><BackLink>Voltar</BackLink><PlayerStage media={preview} loading token={id} message="Preparando sua reprodução…"/></div>
+  const media = (data?.data?.id === id ? data.data : undefined) ?? warm ?? saved ?? library.favorites.find(item => item.id === id)
   if (!media) return <div className="page-shell"><EmptyState title="Reprodução não disponível" description="Não foi possível encontrar os dados deste título." /></div>
   if (provider === playbackProvider && media.source === 'tmdb') return <AutomaticWatch key={id} media={media} catalogProvider={catalogProvider} />
   return <WatchContent key={id} media={media} provider={provider} catalogProvider={catalogProvider} />

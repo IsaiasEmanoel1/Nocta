@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain>dbonline.tech-cdn.top</domain>
+        <domain>zjo.lat</domain>
+        <domain>rfc-infinite.top</domain>
+    </domain-config>
+</network-security-config>

@@ -2,23 +2,40 @@ import { useEffect, useState } from 'react'
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import type { PluginListenerHandle } from '@capacitor/core'
 export interface NativeBounds {x:number;y:number;width:number;height:number;viewportWidth:number;visible:boolean;clipTop?:number;clipBottom?:number}
-export interface PlayerInput { inline?:boolean; bounds?:NativeBounds; title?:string; preferredLanguage?:string; startPositionSeconds?:number; nextAvailable?:boolean; nextPromptSeconds?:number; sessionId?:string; sourceId?:string; inputFingerprint?:string; url:string; mimeType:string; headers?:Record<string,string> }
-export interface PlayerEvent { sessionId?:string; sourceId?:string; inputFingerprint?:string; event:'loaded'|'progress'|'failed'|'ended'|'closed'|'video'|'audio'|'diagnostic'|'next'|'sources'; durationSeconds?:number; positionSeconds:number; detail?:string; category?:'network'|'codec'|'format'|'audio'|'initialization'|'protection'; errorCode?:number; videoRendered?:boolean; audioAdvancing?:boolean; state?:string; playWhenReady?:boolean; isPlaying?:boolean; bufferedSeconds?:number; stale?:boolean }
+export interface PlayerInput { inline?:boolean; bounds?:NativeBounds; title?:string; preferredLanguage?:string; showLanguageNotice?:boolean; startPositionSeconds?:number; nextAvailable?:boolean; nextPromptSeconds?:number; sessionId?:string; sourceId?:string; providerId?:string; inputFingerprint?:string; url:string; mimeType:string; headers?:Record<string,string>; publicMediaTransport?:boolean; mediaDiskCache?:boolean }
+export interface PlayerEvent { sessionId?:string; sourceId?:string; inputFingerprint?:string; event:'loaded'|'progress'|'failed'|'ended'|'closed'|'video'|'audio'|'diagnostic'|'next'|'sources'; durationSeconds?:number; positionSeconds:number; detail?:string; category?:'network'|'codec'|'format'|'audio'|'initialization'|'protection'; errorCode?:number; httpStatus?:number; videoRendered?:boolean; audioAdvancing?:boolean; state?:string; playWhenReady?:boolean; isPlaying?:boolean; bufferedSeconds?:number; stale?:boolean; networkCause?:string; mediaStage?:string; redirectStatus?:number; destinationScheme?:string; httpOperation?:number }
 export interface PlaybackEngine { load(input:PlayerInput):Promise<void>; play():Promise<void>; pause():Promise<void>; seek(seconds:number):Promise<void>; close(sessionId?:string):Promise<void>; onEvent(listener:(event:PlayerEvent)=>void):Promise<()=>void> }
-interface NativePlugin { capabilities():Promise<{available:boolean;playbackAvailable?:boolean;inlinePlayback?:boolean;engine:string}>; load(input:PlayerInput):Promise<void>; play():Promise<void>; pause():Promise<void>; seek(input:{seconds:number}):Promise<void>; close(input?:{sessionId?:string}):Promise<void>; updateControls(input:{sessionId:string;nextAvailable:boolean;bounds?:NativeBounds}):Promise<void>; addListener(name:'nativePlayback',listener:(event:PlayerEvent)=>void):Promise<PluginListenerHandle> }
+interface NativePlugin { inspectFenixRedirect(input:{url:string}):Promise<RedirectObservation>; capabilities():Promise<{available:boolean;playbackAvailable?:boolean;inlinePlayback?:boolean;engine:string;mediaOrigins?:string[];publicMediaTransport?:boolean}>; load(input:PlayerInput):Promise<void>; play():Promise<void>; pause():Promise<void>; seek(input:{seconds:number}):Promise<void>; close(input?:{sessionId?:string}):Promise<void>; updateControls(input:{sessionId:string;nextAvailable:boolean;bounds?:NativeBounds}):Promise<void>; addListener(name:'nativePlayback',listener:(event:PlayerEvent)=>void):Promise<PluginListenerHandle> }
 const plugin=registerPlugin<NativePlugin>('NoctaNativePlayer')
+export type RedirectObservation={downgrade:boolean;status?:number;inconclusive?:boolean}
+export function inspectFenixRedirect(url:string){
+ return Capacitor.getPlatform()==='android'?plugin.inspectFenixRedirect({url}):Promise.resolve({downgrade:false,inconclusive:true} as RedirectObservation)
+}
 export const nativeExperimentEnabled=import.meta.env.VITE_ENABLE_NATIVE_EXPERIMENT==='true'&&Capacitor.getPlatform()==='android'
 export function useNativeExperimentAvailable(){
- const [available,setAvailable]=useState(false)
- useEffect(()=>{let live=true;if(nativeExperimentEnabled)void plugin.capabilities().then(result=>{if(live)setAvailable(result.available)}).catch(()=>{});return()=>{live=false}},[])
+ const [available,setAvailable]=useState<boolean|undefined>(nativeExperimentEnabled?undefined:false)
+ useEffect(()=>{let live=true;if(!nativeExperimentEnabled)return
+  const resolve=(value:boolean)=>{if(live){live=false;setAvailable(value)}}
+  const timer=setTimeout(()=>resolve(false),2000)
+  void plugin.capabilities().then(result=>resolve(result.available)).catch(()=>resolve(false)).finally(()=>clearTimeout(timer))
+  return()=>{live=false;clearTimeout(timer)}
+ },[])
  return available
 }
 export function useNativePlaybackAvailable(){
- const [available,setAvailable]=useState<boolean|undefined>(Capacitor.getPlatform()==='android'?undefined:false)
- useEffect(()=>{let live=true;let timer:ReturnType<typeof setTimeout>|undefined;if(Capacitor.getPlatform()==='android'){
-  timer=setTimeout(()=>{if(live)setAvailable(false)},2000)
-  void plugin.capabilities().then(value=>{if(live)setAvailable((value.playbackAvailable??value.available)&&value.inlinePlayback===true)}).catch(()=>{if(live)setAvailable(false)}).finally(()=>{if(timer)clearTimeout(timer)})
- };return()=>{live=false;if(timer)clearTimeout(timer)}},[])
+ type Availability=boolean|{origins:readonly string[];publicMediaTransport:boolean}
+ const [available,setAvailable]=useState<Availability|undefined>(Capacitor.getPlatform()==='android'?undefined:false)
+ useEffect(()=>{
+  if(Capacitor.getPlatform()!=='android')return
+  let live=true
+  const resolve=(value:Availability)=>{if(live){live=false;setAvailable(value)}}
+  const timer=setTimeout(()=>resolve(false),2000)
+  void plugin.capabilities().then(value=>{
+   const supported=(value.playbackAvailable??value.available)&&value.inlinePlayback===true
+   resolve(supported&&Array.isArray(value.mediaOrigins)?{origins:value.mediaOrigins,publicMediaTransport:value.publicMediaTransport===true}:supported)
+  }).catch(()=>resolve(false)).finally(()=>clearTimeout(timer))
+  return()=>{live=false;clearTimeout(timer)}
+ },[])
  return available
 }
 export const configureNativeControls=(sessionId:string,nextAvailable:boolean,bounds?:NativeBounds)=>plugin.updateControls({sessionId,nextAvailable,...(bounds?{bounds}:{})})

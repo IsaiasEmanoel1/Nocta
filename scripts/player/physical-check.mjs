@@ -46,7 +46,7 @@ try{
    const web=await page.locator('video').evaluateAll(elements=>elements.map(v=>({position:v.currentTime,width:v.videoWidth,height:v.videoHeight,paused:v.paused,error:v.error?.code,duration:Number.isFinite(v.duration)?v.duration:0})))
    if(web.some(v=>v.position>1&&v.width>0&&!v.paused)){row.engine='web';row.videoEvidence=web;break}
    if(await page.getByRole('button',{name:'Abrir player alternativo',exact:true}).count()){row.embedOffered=true;break}
-   if(await page.getByRole('heading',{name:'Não conseguimos iniciar o vídeo',exact:true}).count()){row.failed=true;break}
+   if(await page.getByRole('heading',{name:/^(Não conseguimos iniciar o vídeo|Não foi possível assistir agora)$/}).count()){row.failed=true;break}
   }
   await page.waitForTimeout(1500);await screenshot(`normal-${name}`)
   if(process.argv.includes('--next')&&name==='regular'&&observedRun){

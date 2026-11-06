@@ -5,7 +5,7 @@ export interface Season { id: number; number: number; name: string; episodeCount
 export interface Episode { id: number; number: number; name: string; overview: string; runtime: number; image?: string }
 export interface Media {
   imdbId?: string
-  id: string; kind: MediaKind; title: string; originalTitle?: string; overview: string
+  id: string; kind: MediaKind; title: string; originalTitle?: string; originalLanguage?: string; overview: string
   year: number; rating: number; genres: string[]; genreIds: number[]
   poster: string; backdrop: string; runtime?: number; seasons?: Season[]; cast: Person[]
   directors?: string[]; creators?: string[]; recommendations?: Media[]
